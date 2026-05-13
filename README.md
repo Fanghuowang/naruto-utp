@@ -1,115 +1,111 @@
-# naruto-rasengan
+<div align="center">
 
-A browser demo that turns your webcam into a Naruto effect: open your palm and a rasengan appears above your hand. Two hands = two rasengans.
+# 🌀 naruto-rasengan
 
-## Purpose
+**Summon a chakra orb with your open palm — straight from the browser.**
 
-- Detects hands via MediaPipe Hands, draws a glowing finger-tracking skeleton on top of the webcam feed, and overlays a rasengan video above any open palm.
-- Supports up to two simultaneous hands, each with its own color palette and its own independent rasengan.
-- Does **not** record, upload, or transmit any video — all hand tracking happens locally in the browser.
-- Does **not** require any backend, build step, or framework — it is a single static HTML file plus one video asset.
+[![MediaPipe](https://img.shields.io/badge/MediaPipe-0097A7?logo=google&logoColor=white)](https://google.github.io/mediapipe/solutions/hands.html)
+[![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=000)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](#-license)
 
-## When to use
+[Features](#-features) · [How It Works](#-how-it-works) · [Built With](#%EF%B8%8F-built-with) · [Setup](#-setup) · [Customization](#%EF%B8%8F-customization) · [Credits](#-credits)
 
-- You want a quick, copy-paste-able demo of MediaPipe Hands in vanilla JS.
-- You want a fun party-trick page that maps a hand gesture (open palm) to a visual effect.
-- You want a reference for: per-hand state, gesture edge-detection, blending a transparent-feeling video on top of a webcam canvas.
+<img src="assets/demo.gif" alt="naruto-rasengan demo" width="640"/>
 
-Don't use it as a basis for anything that needs precise, calibrated hand pose (it's a vibe demo, not a motion-capture pipeline).
+</div>
 
-## Inputs
+---
 
-Required:
-- A device with a webcam.
-- A modern browser with `getUserMedia` support (Chrome, Edge, Safari 14+, Firefox).
-- The page must be served from a secure origin (`http://localhost` or `https://...`). Opening `index.html` directly via `file://` will block the camera in most browsers.
-- `assets/rasengan.mp4` — the rasengan video referenced by `<video src="assets/rasengan.mp4">`. The repo currently ships `assets/naruto.mp4`; either rename the file to `rasengan.mp4` or change the `src` attributes in `index.html` to match.
+## ✨ Features
 
-Optional / tunable (constants inside `index.html`):
-- `PALETTES.Left` / `PALETTES.Right` — bone, joint, and glow colors per hand. Defaults: warm orange (left), cool cyan (right).
-- `lift = handSize * 1.8` in `placeOrb` — how high above the palm the orb floats. Increase to raise it further.
-- `charge += 0.06 / -0.18` in `onResults` — fade-in / fade-out speed. Bigger positive = orb appears faster; bigger negative = orb disappears faster.
-- `maxNumHands: 2` — raising this past 2 currently won't help because there are only two `<video class="rasengan">` slots in the markup.
-- `minDetectionConfidence` / `minTrackingConfidence` — lower (e.g. `0.5`) for easier detection at odd angles, higher for fewer false positives.
+- 🖐️ **Open-palm gesture** spawns a rasengan above your hand
+- 👐 **Two hands, two rasengans** — fully independent state per hand
+- 🦴 **Glowing skeleton overlay** with different colors per hand (warm orange / cool cyan)
+- 🎞️ **No alpha video needed** — black backgrounds are dropped with `mix-blend-mode: screen`
+- ⚡ **Zero build** — one static HTML file, libraries loaded from CDN
+- 🔒 **Stays local** — no upload, no backend, the webcam never leaves your machine
 
-Known bad inputs:
-- `file://` URL — camera will be blocked. Serve via a local web server (see Run instructions).
-- Missing `assets/rasengan.mp4` — skeleton still draws, but no orb. Check the DevTools console for a 404.
-- Camera permission denied — nothing renders. Re-grant permission in browser site settings and reload.
+## 🧠 How It Works
 
-## Output contract
+```text
+webcam frame
+   │
+   ▼
+MediaPipe Hands  ──▶  21 landmarks + Left/Right label per hand
+   │
+   ▼
+onResults():
+   • draw bones + joints on canvas
+   • palm-open check (fingertips farther from wrist than knuckles?)
+   • integrate per-hand "charge" → orb opacity
+   • on closed→open edge, restart rasengan video
+   • place video above palm, scaled to hand size
+   │
+   ▼
+composite layers: webcam → skeleton → vignette → rasengan(s)
+```
 
-On screen, top to bottom in z-order:
-1. Mirrored webcam feed (so it feels like a mirror).
-2. Hand skeleton overlay: thin colored bones (lineWidth 3) with a colored glow, plus filled joint dots (radius 3.5). Left hand = orange bones + yellow joints. Right hand = cyan bones + magenta joints.
-3. A radial vignette darkening the edges.
-4. Up to two rasengan videos, blended with `mix-blend-mode: screen`, positioned above each open palm, opacity proportional to per-hand charge.
-5. A hint banner at the bottom.
+The palm-open test compares each fingertip's distance to the wrist against the corresponding PIP-knuckle's distance to the wrist. If three or more fingers extend past their knuckles, the palm is "open" for that frame.
 
-Behavioral guarantees ("done" criteria):
-- Opening a palm causes the corresponding orb to fade in within ~1 second and the video to restart from frame 0.
-- Closing the palm or removing the hand causes the orb to fade out within ~0.3 seconds.
-- Each hand's state is independent — one open + one closed = one orb visible.
-- The skeleton tracks landmarks in real time (no perceptible lag at 30 FPS on a modern laptop).
-- No console errors during normal operation.
+## 🛠️ Built With
 
-## Guardrails
+- [**MediaPipe Hands**](https://google.github.io/mediapipe/solutions/hands.html) — on-device 21-landmark hand model
+- [**@mediapipe/camera_utils**](https://www.npmjs.com/package/@mediapipe/camera_utils) — wraps [`getUserMedia`](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia) and pipes frames to the model
+- [**@mediapipe/drawing_utils**](https://www.npmjs.com/package/@mediapipe/drawing_utils) — `drawConnectors` + the `HAND_CONNECTIONS` topology
+- [**Canvas 2D API**](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D) — skeleton rendering with [`shadowBlur`](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/shadowBlur) glow
+- [**jsDelivr**](https://www.jsdelivr.com/) — CDN for the three MediaPipe scripts, so there's no `npm install`
 
-- The page **only** uses the local webcam stream. No network calls except CDN fetches for MediaPipe scripts on page load.
-- Camera access requires explicit user permission via the browser prompt — don't try to suppress it.
-- The rasengan asset is a third-party clip (`assets/naruto.mp4`); replace it before redistributing if you don't have rights to it.
-- The MediaPipe model files are served from `cdn.jsdelivr.net`; if you need offline use, mirror them locally and update the `locateFile` callback.
-- Don't deploy this to a public URL that auto-loads the camera without context — make the "open your palm" affordance obvious.
-
-## Examples
-
-### Example A (happy path)
-
-Input:
-- User opens the page on `http://localhost:8000`, grants camera permission, holds up an open right palm to the camera.
-
-Expected output shape:
-- A cyan + magenta skeleton appears tracking the right hand.
-- Within ~1 second, a glowing rasengan orb fades in and floats above the palm, scaled and lifted relative to hand size.
-- Closing the hand into a fist causes the orb to fade out within ~0.3 seconds; the skeleton stays as long as the hand is visible.
-
-### Example B (two hands)
-
-Input:
-- Both hands raised, both palms open.
-
-Expected output shape:
-- Two skeletons, one in the warm palette and one in the cool palette.
-- Two independent rasengans, each tracking its own palm. Closing one hand fades only that orb out.
-
-### Example C (edge case — no hands / closed fist)
-
-Input:
-- No hand in frame, or hand in frame but fist closed.
-
-Expected output shape:
-- No skeleton, no orb. Webcam + vignette + hint banner still visible. Any previously-visible orb decays to opacity 0 within ~0.3 seconds.
-
-## Run instructions
-
-From the project root:
+## 🚀 Setup
 
 ```bash
-cd "/path/to/naruto-rasengan"
+git clone https://github.com/<you>/naruto-rasengan.git
+cd naruto-rasengan
 python3 -m http.server 8000
 ```
 
-Then open `http://localhost:8000` in your browser and grant camera permission.
+Open `http://localhost:8000` and grant camera permission. The page needs a real origin (`http://localhost` or `https://...`); `file://` will block `getUserMedia`.
 
-Artifacts:
-- The single source file is `index.html`.
-- Video assets live in `assets/`. The `<video>` tags currently reference `assets/rasengan.mp4` — keep that file there (or rename `naruto.mp4` to match).
-- Nothing is written to disk at runtime.
+> **Note:** The `<video>` tags reference `assets/rasengan.mp4`. Either keep that filename in `assets/`, or update the `src` attributes in [`index.html`](index.html) to match whatever clip you ship.
 
-## Change log
+## 🎛️ Customization
 
-- **v0.1** — initial rewrite from the reference repo (`gprem09/naruto`). Single `naruto.mp4` reused for both hands; per-hand palettes (warm orange / cool cyan) with distinct bone vs joint colors; custom landmark drawing via `arc()`; radial-gradient vignette replacing the multiply-blend darkness layer.
-- **v0.2** — thinned the skeleton lines (bone `lineWidth` 6 → 3, joint radius 6 → 3.5) for a less heavy overlay.
-- **v0.3** — rasengan now floats *above* the palm instead of sitting on it: anchored at the wrist↔mid-knuckle midpoint and lifted upward in screen space (lift = `handSize * 1.8`), independent of hand rotation.
-- **v0.4** — added `autoplay preload="auto"` to the rasengan videos and a `console.warn` on play failure so silent autoplay/policy issues are visible.
-- **v0.5** — switched the orb asset reference from `naruto.mp4` to `rasengan.mp4` (rename your asset accordingly).
+Tunable constants in [`index.html`](index.html):
+
+| Setting | Location | Default | What it does |
+|---|---|---|---|
+| Hand palettes | `PALETTES` object | warm / cool | Bone, joint, and glow colors per hand |
+| Orb lift | `lift = handSize * 1.8` in `placeOrb` | `1.8` | Higher = orb floats farther above the palm |
+| Fade-in speed | `+0.06` in `onResults` | `0.06` | Larger = orb ramps up faster |
+| Fade-out speed | `-0.18` in `onResults` | `0.18` | Larger = orb decays faster |
+| Open-palm threshold | `extended >= 3` in `isPalmOpen` | `3` | Lower = easier to trigger |
+| Tracking sensitivity | `minDetectionConfidence` / `minTrackingConfidence` | `0.65` | Lower = easier detection, more false positives |
+
+## 📁 Project Structure
+
+```
+naruto-rasengan/
+├── assets/
+├── .gitignore
+├── README.md
+└── index.html
+```
+
+- [`assets/`](assets/) — runtime media, including the rasengan video clip
+- [`index.html`](index.html) — the entire app: markup, styles, and the per-frame loop
+
+## 🙌 Credits
+
+- Concept inspired by [gprem09/naruto](https://github.com/gprem09/naruto)
+- Hand tracking by [MediaPipe](https://google.github.io/mediapipe/) (Google)
+- Rasengan from *Naruto* by Masashi Kishimoto — clip used here is a third-party asset, swap it before redistributing if you don't have rights
+
+## 📄 License
+
+[MIT](LICENSE).
+
+---
+
+<div align="center">
+Made with ✨ and a lot of chakra.
+</div>
